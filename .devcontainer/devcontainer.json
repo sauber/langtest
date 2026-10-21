@@ -1,0 +1,16 @@
+{
+	"name": "Langtest",
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
+	"postCreateCommand": "bash .devcontainer/postCreate.sh",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"rust-lang.rust-analyzer",
+				"golang.go",
+				"elmTooling.elm-ls-vscode"
+			]
+		}
+	}
+}

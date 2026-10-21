@@ -1,0 +1,3 @@
+# Keep the docker build context tiny; the image never COPYs project files
+data/
+.git/
