@@ -1,30 +1,22 @@
 # Programming Language Evaluation
 
-The Deno runtime used by current tooling is being retired. To select a
-replacement, the same trading-strategy evaluator will be implemented in each
-candidate language and compared against a baseline implementation in
-Deno/TypeScript. All implementations must follow this specification exactly so
-results are comparable.
-
-## Candidate languages
-
-- Elixir
-- Elm
-- Rust
-- Go
-- Scala 3
-- Raku
-
-## Baseline
-
-- Deno (TypeScript) — the incumbent runtime, implemented as the reference
-  solution for comparison.
+This project implements the same trading-strategy evaluator in each
+candidate language to showcase idiomatic style and unique language features.
+Each implementation should follow the specification's functional requirements
+but use best practices and idiomatic architecture, data structures, and
+patterns for its language. Architecture is open for each implementation.
+Results need not match exactly across implementations; variation is
+acceptable and expected. The Deno implementation is just another
+implementation among others, not a canonical reference to copy.
 
 ## Repository layout
 
-- `data/` — shared market data (already downloaded; see "Test data").
-- `download_kucoin.ts` — existing Deno script that populates `data/`. Do not
-  modify or re-run it unless data must be refreshed.
+- `data/` — shared market data, generated and git-ignored: one CSV per coin
+  (20 files, e.g. `data/BTC-USDT.csv`) plus `data/meta.json`.
+- `download_kucoin.ts` — existing Deno script that populates `data/`. It
+  analyses every coin while it is still in memory and writes the analysis to
+  `data/meta.json` when the download finishes. Do not modify or re-run it
+  unless data must be refreshed.
 - One folder per language at the repository root: `deno/`, `rust/`, `go/`,
   `elixir/`, `elm/`, `scala/`, `raku/`. Each folder contains that language's
   full implementation:
@@ -48,6 +40,20 @@ Market data is already present in `data/`, one CSV per coin (20 files, e.g.
 Rows are sorted ascending by `timestamp`, 1-hour candles. Coins have different
 first and last timestamps, and rows may be missing for hours inside a coin's
 range (gaps). Never assume a continuous hourly series.
+
+### The meta file
+
+`data/meta.json` is the machine-readable description of the downloaded market
+data, written by `download_kucoin.ts` as part of the download. It holds the
+bare minimum needed to plan an implementation and run the evaluation: the
+source and file conventions, the coin list with coverage, the shared
+simulation timeline, and the equal-weight, step-rebalanced market index
+series (`marketIndex.values`, one value per simulation step).
+
+**Read the meta file to understand the data source — in particular while
+planning an implementation — instead of opening or scanning the CSV files.**
+The CSVs are ~91 MB; read the meta file first, and the CSVs only for
+per-bar detail the meta file does not carry.
 
 ## Strategy
 
@@ -93,17 +99,37 @@ Execution rules, applied in order at each step:
 Only the original position's coin is checked for a sell signal — re-entry in the
 same step after a sell is allowed (rules 2 then 3).
 
+### Performance of the step loop
+
+The hourly stepping loop is the hot path of every implementation and must be
+optimized for execution speed — the reported `sim time` is the headline
+benchmark when the languages are compared. Keep it allocation-free, avoid
+repeated scans over all coins, and index bars by timestamp for constant-time
+access. Signals may be computed ahead of the loop: precomputing RSI and buy
+strengths is allowed and encouraged, since only the loop itself is timed.
+
+Optimizations may change how state is represented, never what the simulation
+does.
+
 ## Performance metrics
 
 After the simulation completes, compute:
 
-1. **End result vs. market index.** Build an equal-weighted buy-and-hold index
-   starting at 10,000 USDT: at each coin's first bar inside the simulation
-   window, invest 10,000 / 20 USDT of that coin at that bar's close (coins that
-   start later simply start later; no rebalancing, no fees). Index value over
-   time = sum of held units × last known close. The metric is
+1. **End result vs. market index.** Build an equal-weighted, rebalanced index
+   starting at 10,000 USDT: at every simulation step, first value the portfolio
+   (cash plus holdings at their last known closes), then — with zero fees —
+   pretend everything is sold and split the total equally across the coins
+   *available* at that step, each bought at that step's close. A coin is
+   available at a step only when it has a bar at that step and also a bar at
+   the next step, so the index never holds a coin across a data gap or at the
+   end of its series. Coins that join the data set later add no funds; they
+   simply take part in the next rebalance. When no coin is available at a
+   step, nothing is rebalanced and the portfolio is carried forward, valued at
+   last known closes. The metric is
    `strategy_final_equity / index_final_equity` (values > 1.0 mean the strategy
-   beat the market).
+   beat the market). The index series is precomputed in `data/meta.json` under
+   `marketIndex.values`, one value per simulation step — use those values, do
+   not recompute the index.
 2. **Sharpe ratio.** Compute the simple hourly return of account value at each
    simulation step: `r_t = V_t / V_{t-1} - 1`. Sharpe =
    `mean(r) / stddev(r) × sqrt(8760)`, using the sample standard deviation (n
@@ -156,9 +182,11 @@ canonical testing framework. At minimum, cover:
 - Every code block — function, method, class or impl block, and each logical
   top-level section — must be preceded by exactly one single-line comment
   naming its purpose. No block without a comment; comments never span lines.
-- Use modern best practices applicable to each language
-- Create language implementations in isolation without inspiring from other
-  implementation, also not from deno base line implementation.
+- Use best practices and idiomatic patterns for each specific language
+- Create language implementations in isolation. Do not look at or draw
+  inspiration from other implementations in this repository, including the
+  Deno implementation. Architecture is open and may differ between
+  implementations.
 
 
 
