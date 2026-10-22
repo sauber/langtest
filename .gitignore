@@ -1,5 +1,4 @@
-data/*
-!data/README.md
+data/
 elixir/langtest
 elixir/_build
 elm/elm.js
