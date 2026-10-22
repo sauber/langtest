@@ -4,3 +4,4 @@ elixir/_build
 elm/elm.js
 elm/elm-stuff
 elm/node_modules
+raku/lib/.precomp
