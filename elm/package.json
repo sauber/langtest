@@ -1,0 +1,11 @@
+{
+  "name": "langtest-elm",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Elm implementation of the langtest trading-strategy evaluator",
+  "scripts": {
+    "build": "elm make src/Main.elm --output=elm.js --optimize",
+    "test": "elm-test",
+    "start": "npm run build && node runner.cjs"
+  }
+}
